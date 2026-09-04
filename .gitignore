@@ -1,0 +1,17 @@
+# secrets
+.env
+
+# python
+venv/
+__pycache__/
+*.pyc
+
+# real patient audio — never commit CODA-TB clips
+# only self-recorded demo clips clearly labeled as non-clinical may be added
+test_clip.aac
+test_clip.wav
+tts_test_out/
+
+# os / editor
+.DS_Store
+Thumbs.db
