@@ -86,30 +86,40 @@ with st.spinner("Loading model and artifacts..."):
 # ----------------------------
 
 VOICE_OPTIONS = {
-    "Uzma (female voice)": "ur-PK-UzmaNeural",
-    "Asad (male voice)": "ur-PK-AsadNeural",
+    "Uzma (female voice)": {"tts_voice": "ur-PK-UzmaNeural", "gender": "female"},
+    "Asad (male voice)": {"tts_voice": "ur-PK-AsadNeural", "gender": "male"},
 }
 MODE_VOICE = "🎙️ Conversational voice (Urdu)"
 MODE_MANUAL = "📝 Manual form (English)"
 
 
-def init_voice_state():
+def init_voice_state(profile: dict):
     vs = st.session_state
+    greeting = va.agent_line("greeting", profile["gender"])
     if "v_chat" not in vs:
-        vs.v_chat = [{"role": "assistant", "text": va.GREETING}]
+        vs.v_chat = [{"role": "assistant", "text": greeting, "voice": profile["tts_voice"]}]
         vs.v_qa_index = 0
         vs.v_answers = {}
-        vs.v_agent_line = va.GREETING
+        vs.v_agent_line = greeting
+        vs.v_agent_voice = profile["tts_voice"]
         vs.v_cough_bytes = None
         vs.v_cough_emb = None
         vs.v_result = None
         vs.v_retry = 0
         vs.v_played = None
+    elif vs.v_cough_bytes is None and vs.v_agent_voice != profile["tts_voice"]:
+        vs.v_chat = [{"role": "assistant", "text": greeting, "voice": profile["tts_voice"]}]
+        vs.v_agent_line = greeting
+        vs.v_agent_voice = profile["tts_voice"]
+        vs.v_played = None
 
 
 def run_voice_mode():
-    init_voice_state()
+    profile = VOICE_OPTIONS[st.selectbox("Assistant voice", list(VOICE_OPTIONS), key="v_voice")]
+    init_voice_state(profile)
     vs = st.session_state
+    voice = profile["tts_voice"]
+    agent_gender = profile["gender"]
 
     if not va.llm_available():
         st.warning(
@@ -118,19 +128,18 @@ def run_voice_mode():
         )
         st.stop()
 
-    voice = VOICE_OPTIONS[st.selectbox("Assistant voice", list(VOICE_OPTIONS), key="v_voice")]
-
     # --- chat transcript with per-line replay ---
     for msg in vs.v_chat:
         with st.chat_message("assistant" if msg["role"] == "assistant" else "user"):
             st.write(msg["text"])
             if msg["role"] == "assistant":
-                st.audio(va.synthesize(msg["text"], voice), format="audio/mp3")
+                st.audio(va.synthesize(msg["text"], msg.get("voice", voice)), format="audio/mp3")
 
     # --- autoplay the latest agent line once (replay stays above) ---
-    if vs.v_agent_line and vs.v_played != vs.v_agent_line:
-        st.audio(va.synthesize(vs.v_agent_line, voice), format="audio/mp3", autoplay=True)
-        vs.v_played = vs.v_agent_line
+    latest_key = (vs.get("v_agent_voice", voice), vs.v_agent_line)
+    if vs.v_agent_line and vs.v_played != latest_key:
+        st.audio(va.synthesize(vs.v_agent_line, latest_key[0]), format="audio/mp3", autoplay=True)
+        vs.v_played = latest_key
 
     # --- Step 1: cough recording ---
     if vs.v_cough_bytes is None:
@@ -141,9 +150,10 @@ def run_voice_mode():
                 vs.v_cough_bytes = cough.getvalue()
                 audio = preprocess_audio(io.BytesIO(vs.v_cough_bytes))
                 vs.v_cough_emb = get_embedding(serving_fn, audio)
-            line = va.THANKS_AFTER_COUGH + " " + va.MUST_ASK[0][1]
-            vs.v_chat.append({"role": "assistant", "text": line})
+            line = va.agent_line("thanks_after_cough", agent_gender) + " " + va.MUST_ASK[0][1]
+            vs.v_chat.append({"role": "assistant", "text": line, "voice": voice})
             vs.v_agent_line = line
+            vs.v_agent_voice = voice
             st.rerun()
         return
 
@@ -183,7 +193,9 @@ def run_voice_mode():
                 if text:
                     try:
                         with st.spinner("Thinking (Qwen)..."):
-                            out = va.parse_answer(question, text, unanswered)
+                            out = va.parse_answer(
+                                question, text, unanswered, agent_gender=agent_gender
+                            )
                         for k, v in out["extracted"].items():
                             if v is not None:
                                 vs.v_answers[k] = v
@@ -206,13 +218,16 @@ def run_voice_mode():
                         if vs.v_qa_index < len(va.MUST_ASK)
                         else None
                     )
-                    line = ((ack + " ") if ack else "") + (next_q or va.DONE_ACK)
+                    line = ((ack + " ") if ack else "") + (
+                        next_q or va.agent_line("done_ack", agent_gender)
+                    )
                 else:
                     vs.v_retry = 1
-                    line = va.RETRY_PREFIX + question
+                    line = va.agent_line("retry_prefix", agent_gender) + question
 
-                vs.v_chat.append({"role": "assistant", "text": line})
+                vs.v_chat.append({"role": "assistant", "text": line, "voice": voice})
                 vs.v_agent_line = line
+                vs.v_agent_voice = voice
                 st.rerun()
             return
 
@@ -223,10 +238,13 @@ def run_voice_mode():
             vector = imputer.transform(vector)
             fused = np.hstack([vs.v_cough_emb, vector])
             prob = float(clf.predict_proba(fused)[0, 1])
-            explanation = va.generate_explanation(prob, threshold)
+            explanation = va.generate_explanation(
+                prob, threshold, agent_gender=agent_gender
+            )
         vs.v_result = {"prob": prob, "flagged": prob > threshold, "values": values}
-        vs.v_chat.append({"role": "assistant", "text": explanation})
+        vs.v_chat.append({"role": "assistant", "text": explanation, "voice": voice})
         vs.v_agent_line = explanation
+        vs.v_agent_voice = voice
         st.rerun()
 
     # --- Step 3: result ---
@@ -258,7 +276,7 @@ def run_voice_mode():
 
     if st.button("🔄 Start over"):
         for k in [
-            "v_chat", "v_qa_index", "v_answers", "v_agent_line",
+            "v_chat", "v_qa_index", "v_answers", "v_agent_line", "v_agent_voice",
             "v_cough_bytes", "v_cough_emb", "v_result", "v_retry", "v_played",
         ]:
             st.session_state.pop(k, None)

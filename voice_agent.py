@@ -16,16 +16,45 @@ import edge_tts
 # Spoken Urdu strings (agent-side)
 # ----------------------------
 
-GREETING = (
-    "السلام علیکم! میں کھانسی اے آئی ہوں۔ میں آپ کی کھانسی کی آواز سن کر "
-    "اور چند سوالات کے ذریعے آپ کی ٹی بی کی ابتدائی جانچ کرتا ہوں۔ "
-    "سب سے پہلے، نیچے بٹن دبا کر اپنی کھانسی ریکارڈ کروائیں۔"
-)
+AGENT_GENDERS = ("female", "male")
 
-THANKS_AFTER_COUGH = (
-    "شکریہ! آپ کی کھانسی ریکارڈ ہو گئی ہے۔ "
-    "اب میں آپ سے کچھ سوالات پوچھوں گا۔"
-)
+AGENT_LINES = {
+    "greeting": {
+        "female": (
+            "السلام علیکم! میں کھانسی اے آئی ہوں۔ میں آپ کی کھانسی کی آواز سن کر "
+            "اور چند سوالات کے ذریعے آپ کی ٹی بی کی ابتدائی جانچ کرتی ہوں۔ "
+            "سب سے پہلے، نیچے بٹن دبا کر اپنی کھانسی ریکارڈ کروائیں۔"
+        ),
+        "male": (
+            "السلام علیکم! میں کھانسی اے آئی ہوں۔ میں آپ کی کھانسی کی آواز سن کر "
+            "اور چند سوالات کے ذریعے آپ کی ٹی بی کی ابتدائی جانچ کرتا ہوں۔ "
+            "سب سے پہلے، نیچے بٹن دبا کر اپنی کھانسی ریکارڈ کروائیں۔"
+        ),
+    },
+    "thanks_after_cough": {
+        "female": "شکریہ! آپ کی کھانسی ریکارڈ ہو گئی ہے۔ اب میں آپ سے کچھ سوالات پوچھوں گی۔",
+        "male": "شکریہ! آپ کی کھانسی ریکارڈ ہو گئی ہے۔ اب میں آپ سے کچھ سوالات پوچھوں گا۔",
+    },
+    "done_ack": {
+        "female": "شکریہ! آپ کے تمام جوابات مل گئے۔ اب میں آپ کی کھانسی اور جوابات کا تجزیہ کر رہی ہوں۔",
+        "male": "شکریہ! آپ کے تمام جوابات مل گئے۔ اب میں آپ کی کھانسی اور جوابات کا تجزیہ کر رہا ہوں۔",
+    },
+    "retry_prefix": {
+        "female": "معاف کیجیے گا، مجھے آواز اچھی طرح سمجھ نہیں آئی۔ میں دوبارہ پوچھتی ہوں: ",
+        "male": "معاف کیجیے گا، مجھے آواز اچھی طرح سمجھ نہیں آئی۔ میں دوبارہ پوچھتا ہوں: ",
+    },
+}
+
+
+def _validate_agent_gender(agent_gender: str) -> str:
+    if agent_gender not in AGENT_GENDERS:
+        raise ValueError(f"unsupported agent gender: {agent_gender!r}")
+    return agent_gender
+
+
+def agent_line(name: str, agent_gender: str) -> str:
+    return AGENT_LINES[name][_validate_agent_gender(agent_gender)]
+
 
 # ordered must-ask questions: (field_key, urdu_question)
 MUST_ASK = [
@@ -40,15 +69,6 @@ MUST_ASK = [
     ("tb_prior_type", "اگر ٹی بی ہوئی تھی، تو کیا وہ پھیپھڑوں میں تھی یا جسم کے کسی اور حصے میں؟"),
     ("smoke_lweek", "کیا آپ نے پچھلے ہفتے سگریٹ یا تمباکو استعمال کیا ہے؟"),
 ]
-
-DONE_ACK = (
-    "شکریہ! آپ کے تمام جوابات مل گئے۔ "
-    "اب میں آپ کی کھانسی اور جوابات کا تجزیہ کر رہا ہوں۔"
-)
-
-RETRY_PREFIX = (
-    "معاف کیجیے گا، مجھے آواز اچھی طرح سمجھ نہیں آئی۔ میں دوبارہ پوچھتا ہوں: "
-)
 
 # ----------------------------
 # Answer state -> symptom vector
@@ -120,7 +140,7 @@ def get_whisper_model():
     if _whisper_model is None:
         from faster_whisper import WhisperModel
 
-        _whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+        _whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
     return _whisper_model
 
 
@@ -162,7 +182,7 @@ def synthesize(text: str, voice: str = "ur-PK-UzmaNeural") -> bytes:
 # LLM — Qwen via DashScope
 # ----------------------------
 
-QWEN_MODEL = "qwen-plus"
+QWEN_MODEL = "qwen-plus-character"
 
 SYSTEM_PROMPT = """You are the voice assistant for Khaansi AI, a TB (tuberculosis) screening aid used in Pakistan. You speak ONLY Pakistani Urdu (Urdu script) with the patient. You are warm and use simple everyday words — the patient may be uneducated.
 
@@ -187,6 +207,21 @@ Extraction rules:
 - Handle speech-recognition spelling errors (e.g. خانسی = کھانسی, سہت = صحت, ٹیسٹ/ٹیست)."""
 
 
+def _gender_instruction(agent_gender: str) -> str:
+    gender = _validate_agent_gender(agent_gender)
+    if gender == "female":
+        return (
+            "The selected assistant voice is female. In every first-person Urdu phrase, "
+            "use feminine grammar consistently, including forms such as کرتی ہوں, پوچھوں گی, "
+            "سمجھ سکتی ہوں, and کر رہی ہوں. Never use masculine first-person forms."
+        )
+    return (
+        "The selected assistant voice is male. In every first-person Urdu phrase, "
+        "use masculine grammar consistently, including forms such as کرتا ہوں, پوچھوں گا, "
+        "سمجھ سکتا ہوں, and کر رہا ہوں. Never use feminine first-person forms."
+    )
+
+
 def llm_available() -> bool:
     from dotenv import load_dotenv
 
@@ -195,17 +230,24 @@ def llm_available() -> bool:
 
 
 def _call(messages, temperature: float = 0.3) -> str:
-    from dashscope import Generation
+    import requests
+    from dotenv import load_dotenv
+    load_dotenv()
 
-    resp = Generation.call(
-        model=QWEN_MODEL,
-        messages=messages,
-        result_format="message",
-        temperature=temperature,
+    api_key = os.environ.get("DASHSCOPE_API_KEY")
+    base_url = os.environ.get(
+        "DASHSCOPE_COMPATIBLE_BASE_URL",
+        "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    )
+    resp = requests.post(
+        f"{base_url}/chat/completions",
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        json={"model": QWEN_MODEL, "messages": messages, "temperature": temperature},
+        timeout=60,
     )
     if resp.status_code != 200:
-        raise RuntimeError(f"DashScope error {resp.status_code}: {resp.code} {resp.message}")
-    return resp.output.choices[0].message.content
+        raise RuntimeError(f"DashScope error {resp.status_code}: {resp.text[:300]}")
+    return resp.json()["choices"][0]["message"]["content"]
 
 
 def _parse_json_block(text: str) -> dict:
@@ -218,8 +260,8 @@ def _parse_json_block(text: str) -> dict:
     return json.loads(text[start:end + 1])
 
 
-def parse_answer(current_question: str, patient_answer: str,
-                 fields_to_extract: list) -> dict:
+def parse_answer(current_question: str, patient_answer: str, fields_to_extract: list,
+                 *, agent_gender: str) -> dict:
     """One Qwen call per turn: returns {"speak": str, "extracted": dict}.
     The app (not Qwen) decides which question to ask next."""
     user_msg = json.dumps({
@@ -228,7 +270,7 @@ def parse_answer(current_question: str, patient_answer: str,
         "fields_to_extract": fields_to_extract,
     }, ensure_ascii=False)
     out = _call([
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": f"{SYSTEM_PROMPT}\n\n{_gender_instruction(agent_gender)}"},
         {"role": "user", "content": user_msg},
     ])
     data = _parse_json_block(out)
@@ -237,7 +279,7 @@ def parse_answer(current_question: str, patient_answer: str,
     return data
 
 
-def generate_explanation(prob: float, threshold: float) -> str:
+def generate_explanation(prob: float, threshold: float, *, agent_gender: str) -> str:
     """Risk score -> plain-language Urdu explanation. Never a diagnosis."""
     flagged = prob > threshold
     if flagged:
@@ -271,5 +313,7 @@ def generate_explanation(prob: float, threshold: float) -> str:
 
 Write what you will say to the patient, in simple Pakistani Urdu (Urdu script), 4-6 short sentences:
 {guidance}
+
+{_gender_instruction(agent_gender)}
 Return ONLY the Urdu text to speak."""
     return _call([{"role": "user", "content": prompt}], temperature=0.7)
