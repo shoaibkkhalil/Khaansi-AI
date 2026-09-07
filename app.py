@@ -66,15 +66,269 @@ def get_embedding(serving_fn, audio: np.ndarray) -> np.ndarray:
     return serving_fn(x=audio[np.newaxis, :])["output_0"].numpy()
 
 
+def render_risk_result(prob: float, threshold: float, flagged: bool):
+    pct = prob * 100
+    thr_pct = threshold * 100
+    badge_class = "elevated" if flagged else "low"
+    badge_text = "Elevated risk — consult a clinician" if flagged else "Low risk signal"
+    icon = "⚠️" if flagged else "✅"
+    note = (
+        "This is a screening signal only — please consult a healthcare professional for evaluation."
+        if flagged
+        else "No elevated risk signal detected. This is a screening aid, not a diagnosis."
+    )
+    st.markdown(
+        f"""
+        <div class="khaansi-result-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.5rem;">
+            <span style="font-weight:600;">TB-risk probability</span>
+            <span style="font-size:1.5rem; font-weight:700; color:var(--khaansi-primary);">{pct:.1f}%</span>
+          </div>
+          <div class="khaansi-gauge">
+            <div class="khaansi-gauge-fill" style="width:{pct:.1f}%;"></div>
+            <div class="khaansi-gauge-marker" style="left:{thr_pct:.1f}%;" title="Decision threshold"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+            <span class="khaansi-badge {badge_class}">{icon} {badge_text}</span>
+            <span style="font-size:.8rem; opacity:.7;">Threshold: {threshold:.3f}</span>
+          </div>
+          <p style="margin:.75rem 0 0; opacity:.85;">{note}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_footer():
+    st.markdown(
+        """
+        <div class="khaansi-footer">
+          Khaansi AI — hackathon prototype. Not a medical device. For demonstration only.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 # ----------------------------
 # App UI
 # ----------------------------
 
 st.set_page_config(page_title="Khaansi AI", page_icon="🩺")
-st.title("🩺 Khaansi AI")
-st.caption(
-    "Screening aid only — this is a hackathon prototype, "
-    "not a medical diagnosis."
+
+st.html(
+    """
+    <style>
+    :root {
+        --khaansi-radius: 12px;
+        --khaansi-primary: #0F6E56;
+        --khaansi-bg: #FAFDFC;
+        --khaansi-secondary-bg: #E8F2F0;
+        --khaansi-text: #1A2E2A;
+        --khaansi-border: #D1E0DD;
+        --khaansi-green: #1A7F37;
+        --khaansi-orange: #B35900;
+        --khaansi-red: #A61B1B;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --khaansi-primary: #2A9D8F;
+            --khaansi-bg: #0F1514;
+            --khaansi-secondary-bg: #162220;
+            --khaansi-text: #E8F3F1;
+            --khaansi-border: #2A3D3A;
+        }
+    }
+    .khaansi-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.25rem;
+        border: 1px solid var(--khaansi-border);
+        border-radius: var(--khaansi-radius);
+        background: var(--khaansi-secondary-bg);
+        margin-bottom: 1rem;
+    }
+    .khaansi-header-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: var(--khaansi-primary);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.75rem;
+        flex-shrink: 0;
+    }
+    .khaansi-header-text h1 {
+        margin: 0;
+        font-size: 1.75rem;
+        line-height: 1.2;
+        color: var(--khaansi-text);
+    }
+    .khaansi-header-text p {
+        margin: .25rem 0 0;
+        color: var(--khaansi-text);
+        opacity: .75;
+    }
+    .khaansi-alert {
+        padding: .9rem 1rem;
+        border-radius: var(--khaansi-radius);
+        border: 1px solid;
+        margin: 1rem 0;
+    }
+    .khaansi-alert.info {
+        background: var(--khaansi-secondary-bg);
+        border-color: var(--khaansi-primary);
+        color: var(--khaansi-text);
+    }
+    .khaansi-alert.warning {
+        background: var(--khaansi-secondary-bg);
+        border-color: var(--khaansi-red);
+        color: var(--khaansi-text);
+    }
+    .khaansi-result-card {
+        border: 1px solid var(--khaansi-border);
+        border-radius: var(--khaansi-radius);
+        padding: 1.25rem;
+        background: var(--khaansi-secondary-bg);
+        margin: 1rem 0;
+    }
+    .khaansi-gauge {
+        position: relative;
+        height: 1.25rem;
+        background: var(--khaansi-bg);
+        border-radius: 999px;
+        overflow: hidden;
+        border: 1px solid var(--khaansi-border);
+        margin: .75rem 0 1rem;
+    }
+    .khaansi-gauge-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--khaansi-green) 0%, var(--khaansi-orange) 60%, var(--khaansi-red) 100%);
+        transition: width .4s ease;
+    }
+    .khaansi-gauge-marker {
+        position: absolute;
+        top: -4px;
+        width: 2px;
+        height: calc(100% + 8px);
+        background: var(--khaansi-text);
+        opacity: .7;
+    }
+    .khaansi-badge {
+        display: inline-block;
+        padding: .35rem .75rem;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: .9rem;
+    }
+    .khaansi-badge.elevated {
+        background: color-mix(in srgb, var(--khaansi-red) 12%, transparent);
+        color: var(--khaansi-red);
+    }
+    .khaansi-badge.low {
+        background: color-mix(in srgb, var(--khaansi-green) 12%, transparent);
+        color: var(--khaansi-green);
+    }
+    .khaansi-footer {
+        text-align: center;
+        opacity: .65;
+        font-size: .8rem;
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--khaansi-border);
+        color: var(--khaansi-text);
+    }
+    .st-key-mode_selector [data-testid="stRadio"] > div[role="radiogroup"] {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: .5rem;
+    }
+    .st-key-mode_selector [data-testid="stRadio"] div[role="radiogroup"] > label {
+        border: 1px solid var(--khaansi-border);
+        border-radius: 999px;
+        padding: .75rem 1rem;
+        text-align: center;
+        cursor: pointer;
+        transition: .15s;
+        background: var(--khaansi-bg);
+        color: var(--khaansi-text);
+    }
+    .st-key-mode_selector [data-testid="stRadio"] div[role="radiogroup"] > label:hover {
+        border-color: var(--khaansi-primary);
+    }
+    .st-key-mode_selector [data-testid="stRadio"] div[role="radiogroup"] > label:has(input:checked) {
+        background: var(--khaansi-primary);
+        color: white;
+        border-color: var(--khaansi-primary);
+    }
+    .st-key-mode_selector [data-testid="stRadio"] div[role="radiogroup"] > label:nth-of-type(1)::after {
+        content: "Urdu voice interview";
+        display: block;
+        font-size: .75rem;
+        opacity: .85;
+        margin-top: .15rem;
+    }
+    .st-key-mode_selector [data-testid="stRadio"] div[role="radiogroup"] > label:nth-of-type(2)::after {
+        content: "English form entry";
+        display: block;
+        font-size: .75rem;
+        opacity: .85;
+        margin-top: .15rem;
+    }
+    [class*="st-key-v_msg_"] .khaansi-bubble {
+        max-width: 80%;
+        padding: .75rem 1rem;
+        border-radius: 1.25rem;
+        margin: .25rem 0;
+        box-shadow: 0 1px 2px rgba(0,0,0,.05);
+    }
+    .khaansi-bubble.assistant {
+        background: var(--khaansi-secondary-bg);
+        color: var(--khaansi-text);
+        margin-right: auto;
+        border-bottom-left-radius: .25rem;
+    }
+    .khaansi-bubble.user {
+        background: var(--khaansi-primary);
+        color: white;
+        margin-left: auto;
+        border-bottom-right-radius: .25rem;
+    }
+    .khaansi-bubble .bubble-meta {
+        font-size: .75rem;
+        opacity: .75;
+        margin-bottom: .25rem;
+    }
+    [class*="st-key-v_msg_assistant"] audio {
+        margin-right: auto;
+        display: block;
+        margin-top: .25rem;
+        margin-bottom: .75rem;
+    }
+    [class*="st-key-v_msg_user"] audio {
+        margin-left: auto;
+        display: block;
+        margin-top: .25rem;
+        margin-bottom: .75rem;
+    }
+    </style>
+    """
+)
+
+st.markdown(
+    """
+    <div class="khaansi-header">
+      <div class="khaansi-header-icon">🩺</div>
+      <div class="khaansi-header-text">
+        <h1>Khaansi AI</h1>
+        <p>Screening aid only — this is a hackathon prototype, not a medical diagnosis.</p>
+      </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 with st.spinner("Loading model and artifacts..."):
@@ -122,17 +376,34 @@ def run_voice_mode():
     agent_gender = profile["gender"]
 
     if not va.llm_available():
-        st.warning(
-            "Voice mode needs a DASHSCOPE_API_KEY (set it in a .env file — "
-            "see .env.example). The manual form still works."
+        st.markdown(
+            """
+            <div class="khaansi-alert info">
+              <strong>Voice mode needs a DASHSCOPE_API_KEY.</strong>
+              Set it in a <code>.env</code> file (see <code>.env.example</code>).
+              The manual form still works without it.
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
         st.stop()
 
     # --- chat transcript with per-line replay ---
-    for msg in vs.v_chat:
-        with st.chat_message("assistant" if msg["role"] == "assistant" else "user"):
-            st.write(msg["text"])
-            if msg["role"] == "assistant":
+    for i, msg in enumerate(vs.v_chat):
+        role = msg["role"]
+        bubble_class = "assistant" if role == "assistant" else "user"
+        label = "Assistant" if role == "assistant" else "You"
+        with st.container(key=f"v_msg_{role}_{i}"):
+            st.markdown(
+                f"""
+                <div class="khaansi-bubble {bubble_class}">
+                  <div class="bubble-meta">{label}</div>
+                  <div>{msg["text"]}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            if role == "assistant":
                 st.audio(va.synthesize(msg["text"], msg.get("voice", voice)), format="audio/mp3")
 
     # --- autoplay the latest agent line once (replay stays above) ---
@@ -266,18 +537,7 @@ def run_voice_mode():
     # --- Step 3: result ---
     res = vs.v_result
     st.subheader("Step 3 — Screening result")
-    st.metric("TB-risk probability", f"{res['prob']:.1%}")
-    st.caption(f"Decision threshold: {threshold:.3f}")
-    if res["flagged"]:
-        st.warning(
-            "⚠️ Flagged as elevated risk. This is a screening signal only — "
-            "please consult a healthcare professional for evaluation."
-        )
-    else:
-        st.success(
-            "No elevated risk signal detected. This is a screening aid, "
-            "not a diagnosis."
-        )
+    render_risk_result(res["prob"], threshold, res["flagged"])
 
     with st.expander("Symptom vector used by the model", expanded=False):
         st.table(
@@ -298,8 +558,11 @@ def run_voice_mode():
             st.session_state.pop(k, None)
         st.rerun()
 
+    render_footer()
 
-mode = st.radio("Mode", [MODE_VOICE, MODE_MANUAL], horizontal=True)
+
+with st.container(key="mode_selector"):
+    mode = st.radio("Mode", [MODE_VOICE, MODE_MANUAL], horizontal=True)
 
 if mode == MODE_VOICE:
     run_voice_mode()
@@ -421,16 +684,5 @@ if submitted:
     # Step 6: Display result
     # ----------------------------
     st.subheader("3. Result")
-    st.metric("TB-risk probability", f"{prob:.1%}")
-    st.caption(f"Decision threshold: {threshold:.3f}")
-
-    if flagged:
-        st.warning(
-            "⚠️ Flagged as elevated risk. This is a screening signal only — "
-            "please consult a healthcare professional for evaluation."
-        )
-    else:
-        st.success(
-            "No elevated risk signal detected. This is a screening aid, "
-            "not a diagnosis."
-        )
+    render_risk_result(prob, threshold, flagged)
+    render_footer()

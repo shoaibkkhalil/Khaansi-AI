@@ -1,0 +1,35 @@
+[theme]
+base = "light"
+font = "sans-serif"
+baseRadius = "12px"
+buttonRadius = "999px"
+showWidgetBorder = true
+
+primaryColor = "#0F6E56"
+backgroundColor = "#FAFDFC"
+secondaryBackgroundColor = "#E8F2F0"
+textColor = "#1A2E2A"
+borderColor = "#D1E0DD"
+linkColor = "#0F6E56"
+codeBackgroundColor = "#E8F2F0"
+
+redColor = "#A61B1B"
+orangeColor = "#B35900"
+greenColor = "#1A7F37"
+grayColor = "#5A6E6A"
+
+[theme.light]
+primaryColor = "#0F6E56"
+backgroundColor = "#FAFDFC"
+secondaryBackgroundColor = "#E8F2F0"
+textColor = "#1A2E2A"
+borderColor = "#D1E0DD"
+linkColor = "#0F6E56"
+
+[theme.dark]
+primaryColor = "#2A9D8F"
+backgroundColor = "#0F1514"
+secondaryBackgroundColor = "#162220"
+textColor = "#E8F3F1"
+borderColor = "#2A3D3A"
+linkColor = "#2A9D8F"
