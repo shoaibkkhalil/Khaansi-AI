@@ -70,8 +70,8 @@ def get_embedding(serving_fn, audio: np.ndarray) -> np.ndarray:
 # App UI
 # ----------------------------
 
-st.set_page_config(page_title="Khaansi AI — Test App", page_icon="🩺")
-st.title("🩺 Khaansi AI — Local Test App")
+st.set_page_config(page_title="Khaansi AI", page_icon="🩺")
+st.title("🩺 Khaansi AI")
 st.caption(
     "Screening aid only — this is a hackathon prototype, "
     "not a medical diagnosis."
@@ -143,8 +143,24 @@ def run_voice_mode():
 
     # --- Step 1: cough recording ---
     if vs.v_cough_bytes is None:
-        st.subheader("Step 1 — Record your cough")
-        cough = st.audio_input("Tap to record a cough (a few seconds is enough)", key="cough_rec")
+        st.subheader("Step 1 — Provide a cough recording")
+        input_mode = st.radio(
+            "Input method",
+            ["Record with microphone", "Upload an audio file"],
+            horizontal=True,
+            key="v_cough_input_mode",
+        )
+        cough = None
+        if input_mode == "Record with microphone":
+            cough = st.audio_input(
+                "Tap to record a cough (a few seconds is enough)", key="cough_rec"
+            )
+        else:
+            cough = st.file_uploader(
+                "Upload a WAV/MP3/AAC/etc. audio file",
+                type=["wav", "mp3", "m4a", "aac", "ogg", "flac"],
+                key="v_cough_file",
+            )
         if cough is not None:
             with st.spinner("Analyzing cough..."):
                 vs.v_cough_bytes = cough.getvalue()
