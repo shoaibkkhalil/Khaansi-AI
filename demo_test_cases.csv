@@ -1,2 +1,2 @@
 audio_filename,case_label,sex,age,cough_duration_days,hemoptysis,fever,night_sweats,prior_tb,prior_tb_type,weight_loss,smoke_last_week,expected_result,notes
-1654595668694-recording-1.wav,TB positive case,Male,31,60,No,Yes,Yes,No,N/A,Yes,No,Positive,Classic TB screening presentation: prolonged cough with fever night sweats and weight loss
+demo_cough_positive_case.wav,TB positive case,Male,31,60,No,Yes,Yes,No,N/A,Yes,No,Positive,Classic TB screening presentation: prolonged cough with fever night sweats and weight loss
