@@ -8,4 +8,9 @@ If a stronger Qwen variant becomes available on the free tier or a paid key is u
 
 ## Demo audio
 
-The audio files referenced in `demo_test_cases.csv` are not committed to the repository. Judges can use the listed filename as a reference or record their own cough audio for testing.
+The audio files referenced in `demo_test_cases.csv` are not committed to the repository. Judges can use the listed filename as a reference, or simply record their own cough audio for testing. To try different outcomes, adjust the symptom values in the CSV:
+
+- **TB positive case:** long cough duration, fever, night sweats, weight loss, hemoptysis, prior TB, etc.
+- **TB negative case:** short cough duration, no fever, no night sweats, no weight loss, no hemoptysis, no prior TB, etc.
+
+Upload whichever audio file you record, copy the matching symptom row into the manual form, and click **Analyze**.
