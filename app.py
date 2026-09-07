@@ -360,12 +360,12 @@ def init_voice_state(profile: dict):
         vs.v_cough_emb = None
         vs.v_result = None
         vs.v_retry = 0
-        vs.v_played = None
+        vs.v_played = (profile["tts_voice"], greeting)
     elif vs.v_cough_bytes is None and vs.v_agent_voice != profile["tts_voice"]:
         vs.v_chat = [{"role": "assistant", "text": greeting, "voice": profile["tts_voice"]}]
         vs.v_agent_line = greeting
         vs.v_agent_voice = profile["tts_voice"]
-        vs.v_played = None
+        vs.v_played = (profile["tts_voice"], greeting)
 
 
 def run_voice_mode():
