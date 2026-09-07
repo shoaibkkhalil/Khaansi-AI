@@ -76,7 +76,7 @@ Alibaba's Qwen real-time voice models (ASR/TTS) do **not** officially support Ur
 
 ## Setup
 
-Requirements: Python 3.12, [ffmpeg](https://ffmpeg.org/download.html) on PATH, a DashScope (Alibaba Cloud) API key.
+Requirements: Python 3.12, [ffmpeg](https://ffmpeg.org/download.html) on PATH, a HuggingFace token, and a DashScope (Alibaba Cloud) API key for voice mode.
 
 ```bash
 git clone <repo-url>
@@ -85,9 +85,12 @@ python -m venv venv
 venv\Scripts\activate          # Windows
 pip install -r requirements.txt
 
-copy .env.example .env         # then put your real key in .env
+copy .env.example .env         # add HF_TOKEN (required) and DASHSCOPE_API_KEY (for voice mode)
 streamlit run app.py
 ```
+
+- `HF_TOKEN` is required for both modes because the cough classifier downloads the gated `google/hear` model from HuggingFace.
+- `DASHSCOPE_API_KEY` is only required for **Conversational voice (Urdu)** mode; the manual form works without it once `HF_TOKEN` is set.
 
 Note: `scikit-learn` is pinned to `1.6.1` to match the training environment — other versions fail to unpickle the classifier.
 
