@@ -389,6 +389,7 @@ def run_voice_mode():
         st.stop()
 
     # --- chat transcript with per-line replay ---
+    latest_key = (vs.get("v_agent_voice", voice), vs.v_agent_line)
     for i, msg in enumerate(vs.v_chat):
         role = msg["role"]
         bubble_class = "assistant" if role == "assistant" else "user"
@@ -404,13 +405,15 @@ def run_voice_mode():
                 unsafe_allow_html=True,
             )
             if role == "assistant":
-                st.audio(va.synthesize(msg["text"], msg.get("voice", voice)), format="audio/mp3")
-
-    # --- autoplay the latest agent line once (replay stays above) ---
-    latest_key = (vs.get("v_agent_voice", voice), vs.v_agent_line)
-    if vs.v_agent_line and vs.v_played != latest_key:
-        st.audio(va.synthesize(vs.v_agent_line, latest_key[0]), format="audio/mp3", autoplay=True)
-        vs.v_played = latest_key
+                message_key = (msg.get("voice", voice), msg["text"])
+                autoplay = message_key == latest_key and vs.get("v_played") != latest_key
+                st.audio(
+                    va.synthesize(msg["text"], message_key[0]),
+                    format="audio/mp3",
+                    autoplay=autoplay,
+                )
+                if autoplay:
+                    vs.v_played = latest_key
 
     # --- Step 1: cough recording ---
     if vs.v_cough_bytes is None:
